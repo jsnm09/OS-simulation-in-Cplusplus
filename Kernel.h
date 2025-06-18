@@ -5,6 +5,7 @@
 #include <queue>
 #include "Process.h"
 #include "Schedule.h"
+#include "MemoryManager.h"
 #include <unistd.h>
 #include <string>
 
@@ -16,7 +17,11 @@ vector<Process> processes;
 queue<Process> readyQueue;
 queue<Process> waitingQueue;
 Schedule scheduler;
+MemoryManager memoryManager;
+
 public:
+Kernel() : memoryManager(1024) {}
+
 void start(){
 cout << "Starting JamOS...\n";
 sleep(5);
@@ -27,27 +32,30 @@ sleep(5);
 }
 
 void addProcess(const Process& process){
-    processes.push_back(process);
-    readyQueue.push(process);
-    cout << "Process added: " << process.getProcessID() << 
-    " with burst cycle: " << process.getBurstCycle() << endl;
+    int address = memoryManager.allocate(process.getMemoryFootprint());
+    if (address != -1) {
+        Process newProcess = process;
+        newProcess.setMemoryAddress(address);
+        processes.push_back(newProcess);
+        readyQueue.push(newProcess);
+        cout << "Process added: " << newProcess.getProcessID() 
+             << " with burst cycle: " << newProcess.getBurstCycle() 
+             << " and memory address: " << newProcess.getMemoryAddress() << endl;
+    } else {
+        cout << "Failed to add process " << process.getProcessID() << " due to lack of memory." << endl;
+    }
 }
 
-void scheduleProcesses(int totalCycleCount) {
-    char option;
-    cout << "how do you want to schedule processes FCFS or SJF?(enter f for FCFS or s for SJF)" << endl;
-    cin >> option;
-    switch(option){
-     case 'f':
-              cout << "Scheduling processes with FCFS...\n";
-              scheduler.firstComeFirstServed(readyQueue);
-              break;
-    case 's':
-              cout << "Scheduling processes with SJF...\n";
-              scheduler.shortestJobFirst(readyQueue, totalCycleCount);
-              break;
-    }
-      
+void printMemoryMap() const {
+    memoryManager.printMemoryMap();
+}
+
+queue<Process>& getReadyQueue() {
+    return readyQueue;
+}
+
+MemoryManager& getMemoryManager() {
+    return memoryManager;
 }
 
 bool readyQueueIsEmpty() const {

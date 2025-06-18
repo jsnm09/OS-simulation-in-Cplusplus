@@ -3,68 +3,94 @@
 #include "Kernel.h"
 #include "Schedule.h"
 #include "Process.h"
+
 using namespace std;
 
-
-int main(){
-Bios bios;
-Kernel kernel;
-int numberOfProcesses = 45;
-Process CPU[1];
-int totalCycleCount = 0;
-
-bios.boot();
-
-for(int i = 0; i < numberOfProcesses; i++){
-    Process process;
-    kernel.addProcess(process);
-
+void displayMenu() {
+    cout << "\n--- JamOS Main Menu ---\n"
+         << "1. Create new processes\n"
+         << "2. Schedule processes in Ready Queue\n"
+         << "3. View Memory Map\n"
+         << "4. Shutdown\n"
+         << "Select an option: ";
 }
 
-kernel.scheduleProcesses(totalCycleCount);
+void scheduleProcesses(Kernel& kernel, Schedule& scheduler) {
+    if (kernel.readyQueueIsEmpty()) {
+        cout << "Ready Queue is empty. Nothing to schedule." << endl;
+        return;
+    }
 
-    while (totalCycleCount < 10000) {
-        if (!kernel.readyQueueIsEmpty()) {
-            CPU[0] = kernel.popFromReadyQueue();
-            cout << "Processing Process ID: " << CPU[0].getProcessID() << endl;
+    char option;
+    cout << "How do you want to schedule? (f for FCFS, s for SJF, r for Round Robin): ";
+    cin >> option;
 
-            int cycleCount = 0;
-            while (cycleCount < CPU[0].getBurstCycle() && totalCycleCount < 10000) {
-                cycleCount++;
-                totalCycleCount++;
-                //cout << " Burst Cycle " << cycleCount << " (Total Cycles: " << totalCycleCount << ")" << endl;
+    int quantum = 0;
+    if (option == 'r') {
+        cout << "Enter time quantum for Round Robin: ";
+        cin >> quantum;
+    }
+
+    while (!kernel.readyQueueIsEmpty()) {
+        cout << "----------------------------------------\n";
+        switch (option) {
+            case 'f':
+                scheduler.firstComeFirstServed(kernel.getReadyQueue(), kernel.getMemoryManager());
+                break;
+            case 's':
+                scheduler.shortestJobFirst(kernel.getReadyQueue(), kernel.getMemoryManager());
+                break;
+            case 'r':
+                scheduler.roundRobin(kernel.getReadyQueue(), quantum, kernel.getMemoryManager());
+                break;
+            default:
+                cout << "Invalid scheduling option." << endl;
+                return; 
+        }
+        kernel.printMemoryMap();
+    }
+    cout << "----------------------------------------\n";
+    cout << "All processes in the ready queue have been executed." << endl;
+}
+
+int main() {
+    Bios bios;
+    Kernel kernel;
+    Schedule scheduler;
+    bool powerOn = true;
+
+    bios.boot();
+
+    while (powerOn) {
+        displayMenu();
+        int choice;
+        cin >> choice;
+
+        switch (choice) {
+            case 1: {
+                int num;
+                cout << "How many processes to create? ";
+                cin >> num;
+                for (int i = 0; i < num; ++i) {
+                    Process p;
+                    kernel.addProcess(p);
+                }
+                break;
             }
-
-            cout << "Process ID: " << CPU[0].getProcessID() << " completed its CPU burst" << endl;
-            kernel.pushToWaitingQueue(CPU[0]);
+            case 2:
+                scheduleProcesses(kernel, scheduler);
+                break;
+            case 3:
+                kernel.printMemoryMap();
+                break;
+            case 4:
+                powerOn = false;
+                cout << "Shutting down JamOS..." << endl;
+                break;
+            default:
+                cout << "Invalid option. Please try again." << endl;
+                break;
         }
-
-        while (!kernel.waitingQueueIsEmpty()) {
-            Process process = kernel.popFromWaitingQueue();
-            kernel.addProcess(process);
-        }
-    }
-
-while (!kernel.waitingQueueIsEmpty()){
-    CPU[0]=kernel.popFromWaitingQueue();
-
-    int cycleCount = 0;
-    while(cycleCount < CPU[0].getBurstCycle()){
-        cycleCount++;
-        totalCycleCount++;
-    }
-    kernel.addProcess(CPU[0]);
-
-}
-
-while(!kernel.readyQueueIsEmpty()){
-    Process process = kernel.popFromReadyQueue();
-}
-
-if (!kernel.readyQueueIsEmpty() || !kernel.waitingQueueIsEmpty()) {
-        cout << "There are processes left to execute.\n";
-    } else {
-        cout << "No processes left to execute.\n";
     }
 
     return 0;
